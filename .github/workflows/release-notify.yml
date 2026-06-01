@@ -1,0 +1,65 @@
+name: Notify Telegram on new release
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COPY THIS FILE INTO THE `hiradnikoo/setup-releases` REPO at:
+#     .github/workflows/release-notify.yml
+#
+# It DMs your DevOps Telegram bot whenever a release is published on the hub —
+# Nixo AppBar, SubStudio, Nixosoft React, or any manually-cut release.
+#
+# Required secrets on the setup-releases repo
+# (Settings → Secrets and variables → Actions → New repository secret):
+#     TELEGRAM_DEV_OPS_GAL_BOT_TOKEN   same @BotFather token as open-claw-projects
+#     TELEGRAM_ADMIN_ID                your personal Telegram chat id
+#
+# Note: the appbar/substudio/react workflows in open-claw-projects create these
+# releases with a Personal Access Token (HIRADNIKOO_GITHUB_PAT). Releases made
+# with a PAT DO fire the `release` event here (only the default GITHUB_TOKEN
+# suppresses it), so this catches automated releases as well as manual ones.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send Telegram notification
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_DEV_OPS_GAL_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_ADMIN_ID }}
+          REL_NAME: ${{ github.event.release.name }}
+          REL_TAG: ${{ github.event.release.tag_name }}
+          REL_URL: ${{ github.event.release.html_url }}
+          REL_AUTHOR: ${{ github.event.release.author.login }}
+          REL_PRERELEASE: ${{ github.event.release.prerelease }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          if [ -z "${TG_TOKEN:-}" ] || [ -z "${TG_CHAT:-}" ]; then
+            echo "::notice::Telegram secrets not configured — skipping."
+            exit 0
+          fi
+          esc() { printf '%s' "${1:-}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+          KIND="release"
+          if [ "${REL_PRERELEASE:-false}" = "true" ]; then KIND="pre-release"; fi
+          TEXT="$(printf '🚀 <b>New %s on setup-releases</b>\n%s\n🏷️ %s · 👤 %s\n🔗 %s' \
+            "${KIND}" \
+            "$(esc "${REL_NAME:-$REL_TAG}")" \
+            "$(esc "${REL_TAG}")" \
+            "$(esc "${REL_AUTHOR:-?}")" \
+            "${REL_URL}")"
+          curl --silent --show-error --max-time 20 \
+            -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=${TEXT}" \
+            -o /tmp/tg_resp.json -w "Telegram HTTP %{http_code}\n" || echo "::warning::Telegram request failed."
+          grep -q '"ok":false' /tmp/tg_resp.json 2>/dev/null && echo "::warning::Telegram API error: $(cat /tmp/tg_resp.json)" || true
