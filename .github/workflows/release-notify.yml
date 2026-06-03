@@ -63,7 +63,7 @@ jobs:
           esac
           TAGS="#openclaw #release #${PROJ}"
           [ "${REL_PRERELEASE:-false}" = "true" ] && TAGS="${TAGS} #prerelease"
-          TEXT="$(printf '🚀 <b>New %s on setup-releases</b>\n%s\n🏷️ %s · 👤 %s\n🔗 %s\n%s' \
+          TEXT="$(printf '🚀 <b>New %s on setup-releases</b>\n\n📦 <b>%s</b>\n🏷️ <code>%s</code> · 👤 %s\n🔗 <a href="%s">View release ↗</a>\n\n%s' \
             "${KIND}" \
             "$(esc "${REL_NAME:-$REL_TAG}")" \
             "$(esc "${REL_TAG}")" \
