@@ -49,12 +49,27 @@ jobs:
           esc() { printf '%s' "${1:-}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
           KIND="release"
           if [ "${REL_PRERELEASE:-false}" = "true" ]; then KIND="pre-release"; fi
-          TEXT="$(printf '🚀 <b>New %s on setup-releases</b>\n%s\n🏷️ %s · 👤 %s\n🔗 %s' \
+          # Project hashtag from the tag prefix (Telegram tags use '_' not '-').
+          case "${REL_TAG}" in
+            appbar-*)         PROJ="nixo_appbar" ;;
+            substudio-*)      PROJ="nixosoft_substudio" ;;
+            nixosoft-react-*) PROJ="nixosoft_react" ;;
+            newspulse-*)      PROJ="nixosoft_news_pulse" ;;
+            hardtalk-*)         PROJ="gmail_as_a_service" ;;
+            meshcompute-*)      PROJ="nixosoft_meshcompute" ;;
+            android-auto-hello-*) PROJ="android_auto_hello" ;;
+            travelcomms-*)      PROJ="nixosoft_travel_comms" ;;
+            *) PROJ="$(printf '%s' "${REL_TAG%%-*}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g')" ;;
+          esac
+          TAGS="#openclaw #release #${PROJ}"
+          [ "${REL_PRERELEASE:-false}" = "true" ] && TAGS="${TAGS} #prerelease"
+          TEXT="$(printf '🚀 <b>New %s on setup-releases</b>\n%s\n🏷️ %s · 👤 %s\n🔗 %s\n%s' \
             "${KIND}" \
             "$(esc "${REL_NAME:-$REL_TAG}")" \
             "$(esc "${REL_TAG}")" \
             "$(esc "${REL_AUTHOR:-?}")" \
-            "${REL_URL}")"
+            "${REL_URL}" \
+            "${TAGS}")"
           curl --silent --show-error --max-time 20 \
             -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT}" \
